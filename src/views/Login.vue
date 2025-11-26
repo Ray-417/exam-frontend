@@ -1,5 +1,6 @@
 <template>
   <div class="login-container">
+    <ParticlesBackground color="rgba(255, 255, 255, 0.6)" :count="100" />
     <div class="login-box">
       <div class="login-header">
         <img src="../assets/logo.svg" alt="Logo" class="logo" />
@@ -25,16 +26,13 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
-        <el-form-item prop="userType">
-          <el-select v-model="loginForm.userType" placeholder="请选择用户类型" style="width: 100%" size="large">
-            <el-option label="学生" value="student" />
-            <el-option label="教师" value="teacher" />
-            <el-option label="管理员" value="admin" />
-          </el-select>
-        </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleLogin" class="login-button">登录</el-button>
         </el-form-item>
+        <div class="extra-actions">
+          <el-button link type="info" @click="router.push('/forgot-password')">忘记密码？</el-button>
+          <el-button link type="primary" @click="router.push('/register')">注册新账号</el-button>
+        </div>
       </el-form>
       <div class="login-footer">
         <p>© {{ new Date().getFullYear() }} 超星考试系统 版权所有</p>
@@ -47,6 +45,7 @@
 import { ref, reactive, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
+import ParticlesBackground from '../components/ParticlesBackground.vue'
 
 const router = useRouter()
 const showMessage = inject('showMessage')
@@ -64,9 +63,6 @@ const loginRules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
-  ],
-  userType: [
-    { required: true, message: '请选择用户类型', trigger: 'change' }
   ]
 }
 
@@ -102,15 +98,19 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-  background-size: cover;
+  position: relative;
+  overflow: hidden;
 }
 
 .login-box {
   width: 400px;
   padding: 40px;
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .login-header {
@@ -143,6 +143,14 @@ const handleLogin = async () => {
   width: 100%;
   height: 44px;
   font-size: 16px;
+}
+
+.extra-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -10px;
+  margin-bottom: 20px;
+  padding: 0 4px;
 }
 
 .login-footer {
