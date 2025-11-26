@@ -14,58 +14,69 @@
           text-color="#fff"
           active-text-color="#1890ff"
         >
-          <el-menu-item index="/dashboard/exam-list">
-            <el-icon><Document /></el-icon>
-            <span>考试列表</span>
-          </el-menu-item>
-          
-          <el-sub-menu index="question">
-            <template #title>
+          <!-- Admin Menu -->
+          <template v-if="userType === 'admin'">
+            <el-menu-item index="/dashboard/admin/function-module">
+              <el-icon><Menu /></el-icon>
+              <span>功能模块管理</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/admin/org-management">
+              <el-icon><OfficeBuilding /></el-icon>
+              <span>组织机构管理</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/admin/permission">
+              <el-icon><Lock /></el-icon>
+              <span>权限管理</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/admin/audit-log">
+              <el-icon><Document /></el-icon>
+              <span>操作日志</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/admin/question-audit">
+              <el-icon><Check /></el-icon>
+              <span>题目审核</span>
+            </el-menu-item>
+          </template>
+
+          <!-- Student Menu -->
+          <template v-if="userType === 'student'">
+            <el-menu-item index="/dashboard/student/exam-list">
+              <el-icon><Monitor /></el-icon>
+              <span>查看考试</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/student/practice">
+              <el-icon><EditPen /></el-icon>
+              <span>练题题库</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/student/personalized">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>个性化题库</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/student/profile">
+              <el-icon><User /></el-icon>
+              <span>个人空间</span>
+            </el-menu-item>
+          </template>
+
+          <!-- Teacher Menu -->
+          <template v-if="userType === 'teacher'">
+            <el-menu-item index="/dashboard/teacher/practice">
+              <el-icon><EditPen /></el-icon>
+              <span>练题题库</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/teacher/question-bank">
               <el-icon><Collection /></el-icon>
-              <span>题库管理</span>
-            </template>
-            <el-menu-item index="/dashboard/question-bank">题库列表</el-menu-item>
-          </el-sub-menu>
-          
-          <el-sub-menu index="paper">
-            <template #title>
-              <el-icon><Files /></el-icon>
-              <span>试卷管理</span>
-            </template>
-            <el-menu-item index="/dashboard/paper-management">试卷列表</el-menu-item>
-          </el-sub-menu>
-          
-          <el-sub-menu index="exam">
-            <template #title>
+              <span>考题题库</span>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/teacher/exam-management">
               <el-icon><Calendar /></el-icon>
               <span>考试管理</span>
-            </template>
-            <el-menu-item index="/dashboard/exam-management">考试安排</el-menu-item>
-          </el-sub-menu>
-          
-          <el-menu-item index="/dashboard/marking-papers">
-            <el-icon><Edit /></el-icon>
-            <span>阅卷管理</span>
-          </el-menu-item>
-          
-          <el-menu-item index="/dashboard/results">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>成绩管理</span>
-          </el-menu-item>
-          
-          <el-menu-item index="/dashboard/statistics">
-            <el-icon><PieChart /></el-icon>
-            <span>统计分析</span>
-          </el-menu-item>
-          
-          <el-sub-menu index="system" v-if="userType === 'admin'">
-            <template #title>
-              <el-icon><Setting /></el-icon>
-              <span>系统管理</span>
-            </template>
-            <el-menu-item index="/dashboard/system-management">系统设置</el-menu-item>
-            <el-menu-item index="/dashboard/user-management">用户管理</el-menu-item>
-          </el-sub-menu>
+            </el-menu-item>
+            <el-menu-item index="/dashboard/teacher/score-management">
+              <el-icon><TrendCharts /></el-icon>
+              <span>成绩管理</span>
+            </el-menu-item>
+          </template>
         </el-menu>
       </el-aside>
       
@@ -113,7 +124,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
   Document, Collection, Files, Calendar, Edit, 
-  DataAnalysis, PieChart, Setting, Fold, ArrowDown 
+  DataAnalysis, PieChart, Setting, Fold, ArrowDown,
+  Menu, OfficeBuilding, Lock, Check, Monitor, EditPen, User, TrendCharts
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

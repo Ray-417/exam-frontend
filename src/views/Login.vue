@@ -7,12 +7,12 @@
         <h1 class="title">超星考试系统</h1>
         <p class="subtitle">智慧教学管理平台</p>
       </div>
-      <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+      <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" class="login-form">
         <el-form-item prop="username">
           <el-input 
             v-model="loginForm.username" 
-            placeholder="用户名" 
-            prefix-icon="User"
+            placeholder="用户名 (admin/teacher/student)" 
+            :prefix-icon="User"
             size="large"
           />
         </el-form-item>
@@ -21,7 +21,7 @@
             v-model="loginForm.password" 
             type="password" 
             placeholder="密码" 
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
             size="large"
             @keyup.enter="handleLogin"
           />
@@ -53,8 +53,7 @@ const loading = ref(false)
 
 const loginForm = reactive({
   username: '',
-  password: '',
-  userType: 'student'
+  password: ''
 })
 
 const loginRules = {
@@ -67,27 +66,47 @@ const loginRules = {
 }
 
 const handleLogin = async () => {
-  loading.value = true
-  try {
-    // 模拟登录请求
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 实际项目中应该调用后端API
-    // const response = await axios.post('/api/login', loginForm)
-    
-    // 存储token
-    localStorage.setItem('token', 'mock-token')
-    localStorage.setItem('userType', loginForm.userType)
-    localStorage.setItem('username', loginForm.username)
-    
-    showMessage('登录成功', 'success')
-    router.push('/dashboard')
-  } catch (error) {
-    showMessage('登录失败: ' + (error.message || '未知错误'), 'error')
-  } finally {
-    loading.value = false
-  }
+  if (!loginFormRef.value) return
+
+  await loginFormRef.value.validate(async (valid) => {
+    if (valid) {
+      loading.value = true
+      try {
+        // 模拟登录请求
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // 简单的角色判断逻辑
+        let userType = 'student'
+        if (loginForm.username.includes('admin')) {
+          userType = 'admin'
+        } else if (loginForm.username.includes('teacher')) {
+          userType = 'teacher'
+        }
+        
+        // 存储token
+        localStorage.setItem('token', 'mock-token-' + Date.now())
+        localStorage.setItem('userType', userType)
+        localStorage.setItem('username', loginForm.username)
+        
+        showMessage('登录成功，欢迎回来！', 'success')
+        
+        // 根据角色跳转
+        if (userType === 'admin') {
+          router.push({ name: 'AdminFunctionModule' })
+        } else if (userType === 'teacher') {
+          router.push({ name: 'TeacherPractice' })
+        } else {
+          router.push({ name: 'StudentExamList' })
+        }
+      } catch (error) {
+        showMessage('登录失败: ' + (error.message || '未知错误'), 'error')
+      } finally {
+        loading.value = false
+      }
+    }
+  })
 }
+const loginFormRef = ref(null)
 </script>
 
 <style scoped>
@@ -106,7 +125,6 @@ const handleLogin = async () => {
   width: 400px;
   padding: 40px;
   background-color: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   z-index: 1;
