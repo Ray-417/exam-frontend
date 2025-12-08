@@ -34,14 +34,20 @@
             size="large"
           />
         </el-form-item>
-        <el-form-item prop="email">
-          <el-input 
-            v-model="registerForm.email" 
-            placeholder="邮箱 (选填)" 
-            prefix-icon="Message"
-            size="large"
-          />
-        </el-form-item>
+      <el-form-item prop="email">
+        <el-input 
+          v-model="registerForm.email" 
+          placeholder="邮箱 (选填)" 
+          :prefix-icon="Message"
+          size="large"
+        />
+      </el-form-item>
+      <el-form-item prop="userType" label="用户类型">
+        <el-select v-model="registerForm.userType" placeholder="请选择用户类型" size="large">
+          <el-option label="学生" value="student" />
+          <el-option label="教师" value="teacher" />
+        </el-select>
+      </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleRegister" class="register-button">立即注册</el-button>
         </el-form-item>
@@ -58,6 +64,7 @@ import { ref, reactive, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, Message } from '@element-plus/icons-vue'
 import ParticlesBackground from '../components/ParticlesBackground.vue'
+import request from '@/utils/request'
 
 const router = useRouter()
 const showMessage = inject('showMessage')
@@ -68,7 +75,8 @@ const registerForm = reactive({
   username: '',
   password: '',
   confirmPassword: '',
-  email: ''
+  email: '',
+  userType: ''
 })
 
 const validatePass2 = (rule, value, callback) => {
@@ -91,7 +99,11 @@ const registerRules = {
     { min: 6, message: '密码长度不能少于 6 位', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, validator: validatePass2, trigger: 'blur' }
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validatePass2, trigger: 'blur' }
+  ],
+  userType: [
+    { required: true, message: '请选择用户类型', trigger: 'change' }
   ]
 }
 
@@ -99,19 +111,23 @@ const handleRegister = async () => {
   if (!registerFormRef.value) return
   
   await registerFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        // 模拟注册请求
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        
-        showMessage('注册成功，请登录', 'success')
-        router.push('/login')
-      } catch (error) {
-        showMessage('注册失败: ' + (error.message || '未知错误'), 'error')
-      } finally {
-        loading.value = false
-      }
+    if (!valid) return
+    loading.value = true
+    try {
+      await request.post('/auth/register', {
+        username: registerForm.username,
+        password: registerForm.password,
+        userType: registerForm.userType,
+        email: registerForm.email
+      })
+      
+      showMessage('注册成功，请登录', 'success')
+      router.push('/login')
+    } catch (error) {
+      // request.js 拦截器已处理错误提示
+      // showMessage('注册失败: ' + (error.response?.data?.message || error.message), 'error')
+    } finally {
+      loading.value = false
     }
   })
 }

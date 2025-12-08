@@ -14,23 +14,11 @@
       "element-plus/global"
     ],
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
+      "@/*": ["src/*"]
     },
     "lib": [
-      "esnext",
-      "dom",
-      "dom.iterable",
-      "scripthost"
+      "esnext"
     ]
   },
-  "include": [
-    "src/**/*.js",
-    "src/**/*.vue"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "exclude": ["node_modules"]
 }

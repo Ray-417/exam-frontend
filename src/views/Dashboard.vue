@@ -14,67 +14,138 @@
           text-color="#fff"
           active-text-color="#1890ff"
         >
+          <!-- Common Home -->
+          <el-menu-item index="/dashboard/home">
+            <el-icon><House /></el-icon>
+            <span>首页</span>
+          </el-menu-item>
+
           <!-- Admin Menu -->
           <template v-if="userType === 'admin'">
-            <el-menu-item index="/dashboard/admin/function-module">
+            <el-menu-item 
+              index="/dashboard/admin/function-module"
+              :class="{ 'is-disabled-module': isModuleDisabled('sys_module') }"
+              @click="handleMenuClick($event, 'sys_module')"
+            >
               <el-icon><Menu /></el-icon>
               <span>功能模块管理</span>
+              <el-icon v-if="isModuleDisabled('sys_module')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/admin/org-management">
+            <el-menu-item 
+              index="/dashboard/admin/org-management"
+              :class="{ 'is-disabled-module': isModuleDisabled('sys_org') }"
+              @click="handleMenuClick($event, 'sys_org')"
+            >
               <el-icon><OfficeBuilding /></el-icon>
               <span>组织机构管理</span>
+              <el-icon v-if="isModuleDisabled('sys_org')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/admin/permission">
+            <el-menu-item 
+              index="/dashboard/admin/permission"
+              :class="{ 'is-disabled-module': isModuleDisabled('sys_perm') }"
+              @click="handleMenuClick($event, 'sys_perm')"
+            >
               <el-icon><Lock /></el-icon>
               <span>权限管理</span>
+              <el-icon v-if="isModuleDisabled('sys_perm')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/admin/audit-log">
+            <el-menu-item 
+              index="/dashboard/admin/audit-log"
+              :class="{ 'is-disabled-module': isModuleDisabled('sys_log') }"
+              @click="handleMenuClick($event, 'sys_log')"
+            >
               <el-icon><Document /></el-icon>
               <span>操作日志</span>
-            </el-menu-item>
-            <el-menu-item index="/dashboard/admin/question-audit">
-              <el-icon><Check /></el-icon>
-              <span>题目审核</span>
+              <el-icon v-if="isModuleDisabled('sys_log')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
           </template>
 
           <!-- Student Menu -->
           <template v-if="userType === 'student'">
-            <el-menu-item index="/dashboard/student/exam-list">
+            <el-menu-item 
+              index="/dashboard/student/exam-list"
+              :class="{ 'is-disabled-module': isModuleDisabled('stu_exam') }"
+              @click="handleMenuClick($event, 'stu_exam')"
+            >
               <el-icon><Monitor /></el-icon>
               <span>查看考试</span>
+              <el-icon v-if="isModuleDisabled('stu_exam')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/student/practice">
+            <el-menu-item 
+              index="/dashboard/student/practice"
+              :class="{ 'is-disabled-module': isModuleDisabled('stu_practice') }"
+              @click="handleMenuClick($event, 'stu_practice')"
+            >
               <el-icon><EditPen /></el-icon>
               <span>练题题库</span>
+              <el-icon v-if="isModuleDisabled('stu_practice')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/student/personalized">
+            <el-menu-item 
+              index="/dashboard/student/personalized"
+              :class="{ 'is-disabled-module': isModuleDisabled('stu_personalized') }"
+              @click="handleMenuClick($event, 'stu_personalized')"
+            >
               <el-icon><DataAnalysis /></el-icon>
               <span>个性化题库</span>
+              <el-icon v-if="isModuleDisabled('stu_personalized')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/student/profile">
+            <el-menu-item 
+              index="/dashboard/student/profile"
+              :class="{ 'is-disabled-module': isModuleDisabled('stu_profile') }"
+              @click="handleMenuClick($event, 'stu_profile')"
+            >
               <el-icon><User /></el-icon>
               <span>个人空间</span>
+              <el-icon v-if="isModuleDisabled('stu_profile')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
           </template>
 
           <!-- Teacher Menu -->
           <template v-if="userType === 'teacher'">
-            <el-menu-item index="/dashboard/teacher/practice">
+            <el-menu-item 
+              index="/dashboard/teacher/practice"
+              :class="{ 'is-disabled-module': isModuleDisabled('tch_practice') }"
+              @click="handleMenuClick($event, 'tch_practice')"
+            >
               <el-icon><EditPen /></el-icon>
               <span>练题题库</span>
+              <el-icon v-if="isModuleDisabled('tch_practice')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/teacher/question-bank">
+            <el-menu-item 
+              index="/dashboard/teacher/question-bank"
+              :class="{ 'is-disabled-module': isModuleDisabled('tch_bank') }"
+              @click="handleMenuClick($event, 'tch_bank')"
+            >
               <el-icon><Collection /></el-icon>
               <span>考题题库</span>
+              <el-icon v-if="isModuleDisabled('tch_bank')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/teacher/exam-management">
+            <el-menu-item 
+              index="/dashboard/teacher/exam-management"
+              :class="{ 'is-disabled-module': isModuleDisabled('tch_exam') }"
+              @click="handleMenuClick($event, 'tch_exam')"
+            >
               <el-icon><Calendar /></el-icon>
               <span>考试管理</span>
+              <el-icon v-if="isModuleDisabled('tch_exam')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
-            <el-menu-item index="/dashboard/teacher/score-management">
+            <el-menu-item 
+              index="/dashboard/teacher/score-management"
+              :class="{ 'is-disabled-module': isModuleDisabled('tch_score') }"
+              @click="handleMenuClick($event, 'tch_score')"
+            >
               <el-icon><TrendCharts /></el-icon>
               <span>成绩管理</span>
+              <el-icon v-if="isModuleDisabled('tch_score')" class="disabled-icon"><CircleClose /></el-icon>
+            </el-menu-item>
+            <el-menu-item 
+              index="/dashboard/teacher/question-audit"
+              :class="{ 'is-disabled-module': isModuleDisabled('tch_audit') }"
+              @click="handleMenuClick($event, 'tch_audit')"
+            >
+              <el-icon><Check /></el-icon>
+              <span>题目审核</span>
+              <el-icon v-if="isModuleDisabled('tch_audit')" class="disabled-icon"><CircleClose /></el-icon>
             </el-menu-item>
           </template>
         </el-menu>
@@ -85,8 +156,8 @@
           <div class="header-left">
             <el-icon class="toggle-sidebar" @click="toggleSidebar"><Fold /></el-icon>
             <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
-              <el-breadcrumb-item>{{ currentRoute.meta.title || '未知页面' }}</el-breadcrumb-item>
+              <el-breadcrumb-item :to="{ path: homePath }">首页</el-breadcrumb-item>
+              <el-breadcrumb-item v-if="currentRoute.path !== '/dashboard/home'">{{ currentRoute.meta.title || '未知页面' }}</el-breadcrumb-item>
             </el-breadcrumb>
           </div>
           <div class="header-right">
@@ -125,7 +196,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { 
   Document, Collection, Files, Calendar, Edit, 
   DataAnalysis, PieChart, Setting, Fold, ArrowDown,
-  Menu, OfficeBuilding, Lock, Check, Monitor, EditPen, User, TrendCharts
+  Menu, OfficeBuilding, Lock, Check, Monitor, EditPen, User, TrendCharts, CircleClose, House
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -134,9 +205,23 @@ const sidebarCollapsed = ref(false)
 const username = ref(localStorage.getItem('username') || '用户')
 const userType = ref(localStorage.getItem('userType') || 'student')
 const avatarUrl = ref('')
+const disabledModules = ref((localStorage.getItem('disabledModules') || '').split(','))
 
 const activeMenu = computed(() => route.path)
 const currentRoute = computed(() => route)
+
+const homePath = computed(() => '/dashboard/home')
+
+const isModuleDisabled = (moduleCode) => {
+  return disabledModules.value.includes(moduleCode)
+}
+
+const handleMenuClick = (e, moduleCode) => {
+  if (isModuleDisabled(moduleCode)) {
+    // 阻止默认点击行为 (Element Plus Menu 可能内部处理跳转，这里主要用于视觉反馈逻辑辅助，实际拦截由Router守卫负责)
+    e.preventDefault()
+  }
+}
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
@@ -149,9 +234,9 @@ const handleCommand = (command) => {
     localStorage.removeItem('username')
     router.push('/login')
   } else if (command === 'profile') {
-    // 跳转到个人信息页面
+    router.push({ name: 'UserProfile' })
   } else if (command === 'settings') {
-    // 跳转到账号设置页面
+    router.push({ name: 'AccountSettings' })
   }
 }
 
@@ -269,5 +354,23 @@ onMounted(() => {
   .main-container {
     margin-left: 0;
   }
+}
+
+/* 模块禁用样式 */
+.is-disabled-module {
+  color: #a8abb2 !important; /* 灰色文字 */
+  cursor: not-allowed !important; /* 禁止符号 */
+  pointer-events: none; /* 禁用点击事件 */
+  position: relative;
+}
+
+.is-disabled-module:hover {
+  background-color: transparent !important;
+}
+
+.disabled-icon {
+  position: absolute;
+  right: 10px;
+  color: #f56c6c; /* 红色禁止图标 */
 }
 </style>
