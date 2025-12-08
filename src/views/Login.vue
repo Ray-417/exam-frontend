@@ -45,6 +45,7 @@
 import { ref, reactive, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
+import request from '@/utils/request'
 import ParticlesBackground from '../components/ParticlesBackground.vue'
 
 const router = useRouter()
@@ -69,40 +70,49 @@ const handleLogin = async () => {
   if (!loginFormRef.value) return
 
   await loginFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        // 模拟登录请求
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // 简单的角色判断逻辑
+    if (!valid) return
+    loading.value = true
+    try {
+      const resp = await request.post('/auth/login', {
+        username: loginForm.username,
+        password: loginForm.password
+      })
+      // request.js 拦截器直接返回 response.data，所以这里 resp 就是后端返回的 JSON 对象
+      const data = resp.data || {}
+      const token = data.token
+      const userInfo = data.userInfo || {}
+
+      if (!token || !userInfo.userType) {
+        throw new Error('登录响应不完整')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('userType', userInfo.userType)
+      localStorage.setItem('username', userInfo.username || loginForm.username)
+
+      showMessage('登录成功，欢迎回来！', 'success')
+
+      // 所有角色登录后统一跳转到首页
+      router.push({ name: 'DashboardHome' })
+    } catch (error) {
+      // request.js 已经处理了错误提示，这里主要处理 fallback 逻辑
+      // showMessage('登录失败: ' + (error.message || '未知错误'), 'error')
+
+      // 开发环境或本地开关启用时，使用测试账号作为后备
+      if (import.meta.env.MODE === 'development' || localStorage.getItem('useFakeAuth') === '1') {
         let userType = 'student'
-        if (loginForm.username.includes('admin')) {
-          userType = 'admin'
-        } else if (loginForm.username.includes('teacher')) {
-          userType = 'teacher'
-        }
-        
-        // 存储token
+        if (loginForm.username.includes('admin')) userType = 'admin'
+        else if (loginForm.username.includes('teacher')) userType = 'teacher'
+
         localStorage.setItem('token', 'mock-token-' + Date.now())
         localStorage.setItem('userType', userType)
         localStorage.setItem('username', loginForm.username)
-        
-        showMessage('登录成功，欢迎回来！', 'success')
-        
-        // 根据角色跳转
-        if (userType === 'admin') {
-          router.push({ name: 'AdminFunctionModule' })
-        } else if (userType === 'teacher') {
-          router.push({ name: 'TeacherPractice' })
-        } else {
-          router.push({ name: 'StudentExamList' })
-        }
-      } catch (error) {
-        showMessage('登录失败: ' + (error.message || '未知错误'), 'error')
-      } finally {
-        loading.value = false
+
+        showMessage('登录成功（测试账号）', 'success')
+        router.push({ name: 'DashboardHome' })
       }
+    } finally {
+      loading.value = false
     }
   })
 }
