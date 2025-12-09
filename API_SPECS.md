@@ -629,13 +629,214 @@
 - **Method**: `GET`
 
 ## 3.2 题库管理 (Question Bank Management)
-*(To be detailed: Create/Edit/Delete Questions)*
 
-## 3.3 考试管理 (Exam Management)
-*(To be detailed: Create/Publish Exams)*
+**模块代码**: `tch_bank`
 
-## 3.4 成绩管理 (Score Management)
-*(To be detailed: View/Analyze Scores)*
+教师和管理员用于维护系统题库，支持增删改查及批量导入。
+
+### 3.2.0 数据库表设计 (`biz_question`)
+
+| 字段名 | 类型 | 必填 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `id` | BIGINT | YES | 主键 |
+| `type` | VARCHAR(20) | YES | 题目类型: `single_choice`, `multiple_choice`, `true_false`, `fill_blank`, `short_answer`, `programming` |
+| `content` | TEXT | YES | 题目内容 (JSON/HTML) |
+| `options` | TEXT | NO | 选项内容 (JSON数组: `[{"key":"A","value":"..."}]`) |
+| `answer` | TEXT | YES | 参考答案 |
+| `analysis` | TEXT | NO | 解析 |
+| `difficulty` | TINYINT | YES | 难度: 1-5 |
+| `subject` | VARCHAR(50) | YES | 所属科目 |
+| `knowledge_points`| VARCHAR(255)| NO | 知识点 (逗号分隔) |
+| `creator_id` | BIGINT | YES | 创建人ID |
+| `create_time` | DATETIME | YES | 创建时间 |
+| `status` | TINYINT | YES | 状态: 1-正常, 0-禁用 |
+
+### 3.2.1 获取题目列表
+- **URL**: `/api/questions`
+- **Method**: `GET`
+- **Params**: `page`, `size`, `type`, `keyword`, `difficulty`, `subject`
+
+### 3.2.2 创建题目
+- **URL**: `/api/questions`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "type": "single_choice",
+    "content": "Java中int占用几个字节？",
+    "options": [{"key":"A","value":"2"},{"key":"B","value":"4"}],
+    "answer": "B",
+    "difficulty": 1,
+    "subject": "Java"
+  }
+  ```
+
+### 3.2.3 更新题目
+- **URL**: `/api/questions/{id}`
+- **Method**: `PUT`
+
+### 3.2.4 删除题目
+- **URL**: `/api/questions/{id}`
+- **Method**: `DELETE`
+
+### 3.2.5 批量导入
+- **URL**: `/api/questions/import`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Params**: `file` (Excel/Word)
+
+## 3.3 试卷管理 (Paper Management)
+
+**模块代码**: `tch_paper`
+
+### 3.3.0 数据库表设计 (`biz_paper` & `biz_paper_question`)
+
+**表1: 试卷主表 (`biz_paper`)**
+| 字段名 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | BIGINT | 主键 |
+| `name` | VARCHAR(100)| 试卷名称 |
+| `subject` | VARCHAR(50) | 科目 |
+| `total_score` | INT | 总分 |
+| `pass_score` | INT | 及格分 |
+| `question_count`| INT | 题目数量 |
+| `status` | TINYINT | 状态: 0-草稿, 1-已发布/使用 |
+| `creator_id` | BIGINT | 创建人 |
+
+**表2: 试卷-题目关联表 (`biz_paper_question`)**
+| 字段名 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `paper_id` | BIGINT | 试卷ID |
+| `question_id` | BIGINT | 题目ID |
+| `score` | INT | 该题在试卷中的分值 |
+| `sort_order` | INT | 题目排序 |
+
+### 3.3.1 获取试卷列表
+- **URL**: `/api/papers`
+- **Method**: `GET`
+
+### 3.3.2 创建试卷 (组卷)
+- **URL**: `/api/papers`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "name": "Java期中试卷",
+    "subject": "Java",
+    "questions": [
+      { "id": 101, "score": 5 },
+      { "id": 102, "score": 5 }
+    ]
+  }
+  ```
+
+### 3.3.3 智能组卷
+- **URL**: `/api/papers/auto-generate`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "subject": "Java",
+    "difficulty": 3,
+    "totalScore": 100,
+    "typeDistribution": { "single_choice": 10, "short_answer": 2 }
+  }
+  ```
+
+## 3.4 考试管理 (Exam Management)
+
+**模块代码**: `tch_exam`
+
+### 3.4.0 数据库表设计 (`biz_exam`)
+
+| 字段名 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | BIGINT | 主键 |
+| `name` | VARCHAR(100)| 考试名称 |
+| `paper_id` | BIGINT | 关联试卷ID |
+| `start_time` | DATETIME | 开始时间 |
+| `end_time` | DATETIME | 结束时间 |
+| `duration` | INT | 考试时长(分钟) |
+| `status` | TINYINT | 状态: 0-未开始, 1-进行中, 2-已结束 |
+| `creator_id` | BIGINT | 创建人 |
+
+### 3.4.1 获取考试列表
+- **URL**: `/api/exams`
+- **Method**: `GET`
+- **Params**: `status` (upcoming, ongoing, finished)
+
+### 3.4.2 创建/发布考试
+- **URL**: `/api/exams`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "name": "Java期末考试",
+    "paperId": 101,
+    "startTime": "2023-12-20 09:00:00",
+    "duration": 120
+  }
+  ```
+
+### 3.4.3 监考看板数据
+- **URL**: `/api/monitor/{examId}`
+- **Method**: `GET`
+
+
+## 3.5 成绩管理 (Score Management)
+
+**模块代码**: `tch_score`
+
+### 3.5.0 数据库表设计 (`biz_exam_record` & `biz_exam_answer`)
+
+**表1: 考试记录表 (`biz_exam_record`)**
+| 字段名 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | BIGINT | 主键 |
+| `exam_id` | BIGINT | 考试ID |
+| `student_id` | BIGINT | 学生ID |
+| `score` | INT | 总分 |
+| `status` | TINYINT | 状态: 0-进行中, 1-已提交, 2-已批改 |
+| `start_time` | DATETIME | 开始答题时间 |
+| `submit_time` | DATETIME | 交卷时间 |
+
+**表2: 答题明细表 (`biz_exam_answer`)**
+| 字段名 | 类型 | 描述 |
+| :--- | :--- | :--- |
+| `id` | BIGINT | 主键 |
+| `record_id` | BIGINT | 考试记录ID |
+| `question_id` | BIGINT | 题目ID |
+| `student_answer`| TEXT | 学生答案 |
+| `score` | INT | 得分 |
+| `is_correct` | BOOLEAN | 是否正确 (客观题自动判断) |
+| `comment` | VARCHAR(500)| 评语 |
+
+### 3.5.1 获取成绩列表
+- **URL**: `/api/scores`
+- **Method**: `GET`
+- **Params**: `examId`, `classId`, `keyword`
+
+### 3.5.2 获取考生答卷详情 (阅卷)
+- **URL**: `/api/scores/{examId}/student/{studentId}`
+- **Method**: `GET`
+
+### 3.5.3 提交阅卷结果
+- **URL**: `/api/scores/{examId}/student/{studentId}`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "totalScore": 88,
+    "questions": [
+      { "id": 4, "givenScore": 8, "comment": "回答基本正确" }
+    ]
+  }
+  ```
+
+### 3.5.4 成绩统计
+- **URL**: `/api/scores/stats`
+- **Method**: `GET`
+- **Params**: `examId`
 
 ---
 
@@ -646,8 +847,25 @@
 前端页面：`student/ExamList.vue`
 
 ### 4.1.1 考试列表
-- **URL**: `/api/exam/list`
+- **URL**: `/api/student/exams`
 - **Method**: `GET`
+- **Params**: `status` (upcoming, ongoing, finished)
+
+### 4.1.2 参加考试 (获取试卷)
+- **URL**: `/api/student/exams/{examId}/paper`
+- **Method**: `GET`
+- **Response**: 包含题目列表 (不含答案)
+
+### 4.1.3 提交试卷
+- **URL**: `/api/student/exams/{examId}/submit`
+- **Method**: `POST`
+- **Body**:
+  ```json
+  {
+    "answers": { "101": "A", "102": "B" },
+    "durationUsed": 3600
+  }
+  ```
 
 ## 4.2 练题题库 (Practice Bank)
 *(To be detailed)*
