@@ -119,7 +119,7 @@ const roleActions = {
     { name: '我的考试', path: '/dashboard/student/exam-list', icon: 'Monitor', color: '#409EFF' },
     { name: '自由练题', path: '/dashboard/student/practice', icon: 'Edit', color: '#67C23A' },
     { name: '个性化推荐', path: '/dashboard/student/personalized', icon: 'Reading', color: '#E6A23C' },
-    { name: '个人空间', path: '/dashboard/student/profile', icon: 'User', color: '#909399' }
+    { name: '个人空间', path: '/dashboard/student/profile', icon: 'Setting', color: '#909399' }
   ]
 }
 
