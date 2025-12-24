@@ -1,11 +1,18 @@
 <template>
   <div class="score-management-container">
-    <el-tabs v-model="activeTab" type="border-card">
+    <el-tabs v-model="activeTab" type="border-card" @tab-change="handleTabChange">
+      <!-- ==================== 1. 阅卷管理 ==================== -->
       <el-tab-pane label="阅卷管理" name="grading">
         <div class="grading-pane">
           <div class="page-header">
+            <div class="header-left" style="display: flex; align-items: center;">
+            <el-button v-if="showBackButton" :icon="ArrowLeft" circle @click="goBack" style="margin-right: 15px;" />
             <h2 class="page-title">阅卷管理</h2>
+          </div>
             <div class="header-actions">
+              <el-button type="warning" @click="registerScores" v-if="!isGrading && isAllGraded">
+                <el-icon><Upload /></el-icon>登记成绩
+              </el-button>
               <el-button type="primary" @click="startGrading" v-if="!isGrading">
                 <el-icon><Edit /></el-icon>开始批阅
               </el-button>
@@ -24,31 +31,31 @@
             <div class="exam-info">
               <div class="info-item">
                 <span class="label">考试名称：</span>
-                <span class="value">{{ gradingExamInfo.name }}</span>
+                <span class="value">{{ currentExam.name }}</span>
               </div>
               <div class="info-item">
                 <span class="label">科目：</span>
-                <span class="value">{{ gradingExamInfo.subject }}</span>
+                <span class="value">{{ currentExam.subject }}</span>
               </div>
               <div class="info-item">
                 <span class="label">考试时间：</span>
-                <span class="value">{{ gradingExamInfo.examTime }}</span>
+                <span class="value">{{ currentExam.examTime }}</span>
               </div>
               <div class="info-item">
                 <span class="label">考试时长：</span>
-                <span class="value">{{ gradingExamInfo.duration }}分钟</span>
+                <span class="value">{{ currentExam.duration }}分钟</span>
               </div>
               <div class="info-item">
                 <span class="label">总分：</span>
-                <span class="value">{{ gradingExamInfo.totalScore }}分</span>
+                <span class="value">{{ currentExam.totalScore }}分</span>
               </div>
               <div class="info-item">
                 <span class="label">参考人数：</span>
-                <span class="value">{{ gradingExamInfo.studentCount }}人</span>
+                <span class="value">{{ currentExam.studentCount }}人</span>
               </div>
               <div class="info-item">
                 <span class="label">批阅进度：</span>
-                <span class="value">{{ gradingExamInfo.gradedCount }}/{{ gradingExamInfo.studentCount }}</span>
+                <span class="value">{{ gradedCount }}/{{ currentExam.studentCount }}</span>
               </div>
             </div>
           </el-card>
@@ -124,7 +131,7 @@
                   <template #header>
                     <div class="card-header">
                       <span>学生列表</span>
-                      <el-select v-model="gradingFilterStatus" placeholder="筛选状态" size="small">
+                      <el-select v-model="gradingFilterStatus" placeholder="筛选状态" size="small" style="width: 100px">
                         <el-option label="全部" value="" />
                         <el-option label="未批阅" value="ungraded" />
                         <el-option label="已批阅" value="graded" />
@@ -151,8 +158,8 @@
                     </el-table>
                   </div>
                   <div class="grading-actions">
-                    <el-button type="primary" @click="saveCurrentGrading">保存当前</el-button>
-                    <el-button @click="nextStudent" :disabled="!hasNextStudent">下一个</el-button>
+                    <el-button type="primary" @click="handleSubmitGrading">提交评分</el-button>
+                    <el-button @click="handleNextStudent" :disabled="!hasNextStudent">下一个</el-button>
                   </div>
                 </el-card>
               </el-col>
@@ -166,10 +173,15 @@
                   <span>批阅统计</span>
                 </div>
               </template>
-              <el-table :data="gradingStudentList" border style="width: 100%">
+              <el-table :data="allStudents" border style="width: 100%">
+                <el-table-column prop="studentId" label="学号" width="120" />
                 <el-table-column prop="name" label="姓名" width="100" />
-                <el-table-column prop="id" label="学号" width="120" />
-                <el-table-column prop="score" label="总分" width="100" />
+                <el-table-column prop="className" label="班级" width="120" />
+                <el-table-column prop="score" label="总分" width="100">
+                   <template #default="scope">
+                    {{ scope.row.score !== null ? scope.row.score : '-' }}
+                  </template>
+                </el-table-column>
                 <el-table-column prop="status" label="状态" width="100">
                   <template #default="scope">
                     <el-tag :type="scope.row.status === 'graded' ? 'success' : 'info'">
@@ -191,198 +203,229 @@
         </div>
       </el-tab-pane>
       
-      <el-tab-pane label="成绩统计" name="results">
-        <div class="results-pane">
-          <div class="page-header">
-            <h2 class="page-title">成绩统计</h2>
-            <div>
-              <el-button type="primary" @click="exportResults">
-                <el-icon><Download /></el-icon>导出成绩
-              </el-button>
-            </div>
-          </div>
-          
+      <!-- ==================== 2. 成绩管理 ==================== -->
+      <el-tab-pane label="成绩管理" name="score">
+        <div class="score-pane">
+          <!-- 筛选与操作栏 -->
           <el-card class="filter-card">
+            <div class="filter-header">
+               <span class="filter-title">筛选查询</span>
+               <div class="filter-actions">
+                  <el-button type="primary" plain @click="importScores">
+                    <el-icon><Upload /></el-icon> 批量导入
+                  </el-button>
+                  <el-button type="success" plain @click="exportResults">
+                    <el-icon><Download /></el-icon> 导出成绩单
+                  </el-button>
+               </div>
+            </div>
             <div class="filter-container">
-              <el-form :inline="true" :model="resultsFilterForm" class="filter-form">
+              <el-form :inline="true" :model="scoreFilterForm" class="filter-form">
                 <el-form-item label="考试名称">
-                  <el-select v-model="resultsFilterForm.examId" placeholder="选择考试" clearable>
+                  <el-select v-model="scoreFilterForm.examId" placeholder="选择考试" clearable @change="handleScoreExamChange" style="width: 200px">
                     <el-option v-for="item in examOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="班级">
-                  <el-select v-model="resultsFilterForm.classId" placeholder="选择班级" clearable>
+                  <el-select v-model="scoreFilterForm.classId" placeholder="选择班级" clearable style="width: 150px">
                     <el-option v-for="item in classOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="学号/姓名">
-                  <el-input v-model="resultsFilterForm.keyword" placeholder="输入学号或姓名" clearable />
+                  <el-input v-model="scoreFilterForm.keyword" placeholder="输入学号或姓名" clearable prefix-icon="Search" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" @click="handleSearch">
-                    <el-icon><Search /></el-icon>搜索
-                  </el-button>
-                  <el-button @click="resetFilter">重置</el-button>
+                  <el-button type="primary" @click="handleScoreSearch">搜索</el-button>
+                  <el-button @click="resetScoreFilter">重置</el-button>
                 </el-form-item>
               </el-form>
             </div>
           </el-card>
-          
-          <div class="results-content" v-if="currentResultsExam.id">
-            <el-card class="exam-info-card">
+
+          <!-- 成绩列表 -->
+          <el-card class="results-table-card">
               <template #header>
                 <div class="card-header">
-                  <span>{{ currentResultsExam.name }}</span>
-                  <el-tag type="success">已完成</el-tag>
+                  <div class="left">
+                    <span>成绩列表</span>
+                    <el-tag type="info" style="margin-left: 10px">共 {{ filteredScoreList.length }} 条数据</el-tag>
+                  </div>
+                  <div class="right" v-if="selectedStudents.length > 0">
+                    <el-button type="success" size="small" @click="batchPublish(true)">批量发布</el-button>
+                    <el-button type="warning" size="small" @click="batchPublish(false)">批量撤回</el-button>
+                  </div>
                 </div>
               </template>
-              <div class="exam-info">
-                <div class="info-item">
-                  <span class="label">考试科目：</span>
-                  <span class="value">{{ currentResultsExam.subject }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">考试时间：</span>
-                  <span class="value">{{ currentResultsExam.examTime }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">总分：</span>
-                  <span class="value">{{ currentResultsExam.totalScore }}分</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">参考人数：</span>
-                  <span class="value">{{ currentResultsExam.studentCount }}人</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">平均分：</span>
-                  <span class="value">{{ currentResultsExam.averageScore }}分</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">最高分：</span>
-                  <span class="value">{{ currentResultsExam.highestScore }}分</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">最低分：</span>
-                  <span class="value">{{ currentResultsExam.lowestScore }}分</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">及格率：</span>
-                  <span class="value">{{ currentResultsExam.passRate }}%</span>
-                </div>
-              </div>
-            </el-card>
-            
-            <div class="charts-container">
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-card class="chart-card">
-                    <template #header>
-                      <div class="card-header">
-                        <span>分数分布</span>
-                      </div>
-                    </template>
-                    <div class="chart-placeholder">
-                      <div class="chart-mock">
-                        <div class="chart-bar" style="height: 30%; background-color: #67C23A;">
-                          <div class="chart-label">90-100</div>
-                        </div>
-                        <div class="chart-bar" style="height: 60%; background-color: #409EFF;">
-                          <div class="chart-label">80-89</div>
-                        </div>
-                        <div class="chart-bar" style="height: 80%; background-color: #E6A23C;">
-                          <div class="chart-label">70-79</div>
-                        </div>
-                        <div class="chart-bar" style="height: 40%; background-color: #F56C6C;">
-                          <div class="chart-label">60-69</div>
-                        </div>
-                        <div class="chart-bar" style="height: 20%; background-color: #909399;">
-                          <div class="chart-label">0-59</div>
-                        </div>
-                      </div>
-                    </div>
-                  </el-card>
-                </el-col>
-                <el-col :span="12">
-                  <el-card class="chart-card">
-                    <template #header>
-                      <div class="card-header">
-                        <span>班级平均分对比</span>
-                      </div>
-                    </template>
-                    <div class="chart-placeholder">
-                      <div class="chart-mock horizontal">
-                        <div class="chart-row">
-                          <div class="chart-label">计科1班</div>
-                          <div class="chart-bar-h" style="width: 85%; background-color: #409EFF;">85</div>
-                        </div>
-                        <div class="chart-row">
-                          <div class="chart-label">计科2班</div>
-                          <div class="chart-bar-h" style="width: 78%; background-color: #409EFF;">78</div>
-                        </div>
-                        <div class="chart-row">
-                          <div class="chart-label">软工1班</div>
-                          <div class="chart-bar-h" style="width: 82%; background-color: #409EFF;">82</div>
-                        </div>
-                        <div class="chart-row">
-                          <div class="chart-label">软工2班</div>
-                          <div class="chart-bar-h" style="width: 80%; background-color: #409EFF;">80</div>
-                        </div>
-                      </div>
-                    </div>
-                  </el-card>
-                </el-col>
-              </el-row>
-            </div>
-            
-            <el-card class="results-table-card">
-              <template #header>
-                <div class="card-header">
-                  <span>成绩列表</span>
-                </div>
-              </template>
-              <el-table :data="resultsList" border style="width: 100%">
-                <el-table-column prop="studentId" label="学号" width="120" />
+              <el-table 
+                :data="paginatedScoreList" 
+                border 
+                stripe
+                style="width: 100%" 
+                id="score-table"
+                @selection-change="handleSelectionChange"
+              >
+                <el-table-column type="selection" width="55" />
+                <el-table-column prop="studentId" label="学号" width="120" sortable />
                 <el-table-column prop="name" label="姓名" width="100" />
-                <el-table-column prop="className" label="班级" width="120" />
-                <el-table-column prop="score" label="成绩" width="100">
+                <el-table-column prop="className" label="班级" width="120" sortable />
+                <el-table-column prop="score" label="成绩" width="100" sortable>
                   <template #default="scope">
-                    <span :class="getScoreClass(scope.row.score)">{{ scope.row.score }}</span>
+                    <span :class="getScoreClass(scope.row.score)" style="font-size: 16px;">{{ scope.row.score !== null ? scope.row.score : '-' }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="rank" label="排名" width="80" />
-                <el-table-column prop="submitTime" label="提交时间" width="180" />
-                <el-table-column prop="status" label="状态" width="100">
+                <el-table-column label="排名" width="80" align="center">
                   <template #default="scope">
-                    <el-tag :type="scope.row.status === 'normal' ? 'success' : 'danger'">
-                      {{ scope.row.status === 'normal' ? '正常' : '异常' }}
+                    <el-tag effect="plain" type="info">{{ getRank(scope.row) }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="submitTime" label="提交时间" width="180" sortable />
+                <el-table-column prop="status" label="状态" width="100" align="center">
+                  <template #default="scope">
+                    <el-tag :type="scope.row.status === 'graded' ? 'success' : 'info'" effect="dark">
+                      {{ scope.row.status === 'graded' ? '已发布' : '未发布' }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="200">
+                <el-table-column label="操作" min-width="200" fixed="right">
                   <template #default="scope">
-                    <el-button link type="primary" @click="viewDetail(scope.row)">查看详情</el-button>
-                    <el-button link type="primary" @click="adjustScore(scope.row)">调整分数</el-button>
+                    <el-button link type="primary" @click="viewDetail(scope.row)">
+                      <el-icon><Document /></el-icon> 详情
+                    </el-button>
+                    <el-button link type="primary" @click="handleAdjustScore(scope.row)">
+                      <el-icon><Edit /></el-icon> 调整
+                    </el-button>
                   </template>
                 </el-table-column>
               </el-table>
               
               <div class="pagination-container">
                 <el-pagination
-                  v-model:current-page="resultsCurrentPage"
-                  v-model:page-size="resultsPageSize"
+                  v-model:current-page="scoreCurrentPage"
+                  v-model:page-size="scorePageSize"
                   :page-sizes="[10, 20, 30, 50]"
                   layout="total, sizes, prev, pager, next, jumper"
-                  :total="resultsTotal"
-                  @size-change="handleResultsSizeChange"
-                  @current-change="handleResultsCurrentChange"
+                  :total="filteredScoreList.length"
                 />
               </div>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
+      <!-- ==================== 3. 成绩分析 ==================== -->
+      <el-tab-pane label="成绩分析" name="analysis">
+        <div class="analysis-pane">
+            <div class="page-header">
+                <h2 class="page-title">成绩分析</h2>
+            </div>
+            
+            <el-card class="filter-card">
+                <el-form :inline="true" :model="analysisFilterForm">
+                    <el-form-item label="选择考试">
+                        <el-select v-model="analysisFilterForm.examId" placeholder="请选择考试" @change="calculateAnalysisData">
+                            <el-option v-for="item in examOptions" :key="item.id" :label="item.name" :value="item.id" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item>
+                         <el-button type="primary" @click="calculateAnalysisData">刷新分析</el-button>
+                    </el-form-item>
+                </el-form>
             </el-card>
-          </div>
-          
-          <div class="no-exam-selected" v-else>
-            <el-empty description="请选择一个考试查看成绩" />
-          </div>
+
+            <div class="analysis-content" v-if="analysisData.totalCount > 0">
+                 <el-card class="exam-info-card">
+                    <template #header>
+                        <div class="card-header">
+                        <span>{{ currentExam.name }} - 概览 (共 {{ analysisData.totalCount }} 人)</span>
+                        <el-tag type="success">实时统计</el-tag>
+                        </div>
+                    </template>
+                    
+                    <el-row :gutter="20" class="score-summary-row">
+                        <el-col :span="6">
+                            <el-card shadow="hover" class="summary-card">
+                                <template #header><div class="card-header-small">平均分</div></template>
+                                <div class="summary-value text-primary">{{ analysisData.avgScore }}</div>
+                            </el-card>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-card shadow="hover" class="summary-card">
+                                <template #header><div class="card-header-small">最高分</div></template>
+                                <div class="summary-value text-success">{{ analysisData.maxScore }}</div>
+                            </el-card>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-card shadow="hover" class="summary-card">
+                                <template #header><div class="card-header-small">最低分</div></template>
+                                <div class="summary-value text-danger">{{ analysisData.minScore }}</div>
+                            </el-card>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-card shadow="hover" class="summary-card">
+                                <template #header><div class="card-header-small">及格率</div></template>
+                                <div class="summary-value text-warning">{{ analysisData.passRate }}%</div>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                 </el-card>
+
+                 <div class="charts-container">
+                    <el-row :gutter="20">
+                        <el-col :span="12">
+                        <el-card class="chart-card">
+                            <template #header>
+                            <div class="card-header"><span>分数段分布</span></div>
+                            </template>
+                            <div class="chart-placeholder">
+                            <div class="chart-mock">
+                                <div class="chart-bar" :style="{height: analysisData.dist[4] + '%', backgroundColor: '#67C23A'}"><div class="chart-label">90-100<br>({{analysisData.distCount[4]}}人)</div></div>
+                                <div class="chart-bar" :style="{height: analysisData.dist[3] + '%', backgroundColor: '#409EFF'}"><div class="chart-label">80-89<br>({{analysisData.distCount[3]}}人)</div></div>
+                                <div class="chart-bar" :style="{height: analysisData.dist[2] + '%', backgroundColor: '#E6A23C'}"><div class="chart-label">70-79<br>({{analysisData.distCount[2]}}人)</div></div>
+                                <div class="chart-bar" :style="{height: analysisData.dist[1] + '%', backgroundColor: '#F56C6C'}"><div class="chart-label">60-69<br>({{analysisData.distCount[1]}}人)</div></div>
+                                <div class="chart-bar" :style="{height: analysisData.dist[0] + '%', backgroundColor: '#909399'}"><div class="chart-label">0-59<br>({{analysisData.distCount[0]}}人)</div></div>
+                            </div>
+                            </div>
+                        </el-card>
+                        </el-col>
+                        <el-col :span="12">
+                        <el-card class="chart-card">
+                            <template #header>
+                            <div class="card-header"><span>班级平均分对比</span></div>
+                            </template>
+                            <div class="chart-placeholder">
+                            <div class="chart-mock horizontal">
+                                <div class="chart-row" v-for="cls in analysisData.classStats" :key="cls.name">
+                                  <div class="chart-label">{{cls.name}}</div>
+                                  <div class="chart-bar-h" :style="{width: cls.avg + '%', backgroundColor: '#409EFF'}">{{cls.avg}}</div>
+                                </div>
+                            </div>
+                            </div>
+                        </el-card>
+                        </el-col>
+                    </el-row>
+                    
+                    <el-row :gutter="20" style="margin-top: 20px;">
+                        <el-col :span="24">
+                           <el-card class="chart-card">
+                            <template #header>
+                            <div class="card-header"><span>知识点掌握情况分析</span></div>
+                            </template>
+                             <el-table :data="analysisData.knowledgePoints" border>
+                                <el-table-column prop="name" label="知识点" />
+                                <el-table-column label="错误率" width="200">
+                                   <template #default="scope">
+                                      <el-progress :percentage="scope.row.errorRate" status="exception" />
+                                   </template>
+                                </el-table-column>
+                                <el-table-column prop="suggestion" label="教学建议" />
+                             </el-table>
+                           </el-card>
+                        </el-col>
+                    </el-row>
+                 </div>
+            </div>
+             <div class="no-exam-selected" v-else>
+                <el-empty description="当前考试暂无数据或未选择考试" />
+            </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -397,7 +440,7 @@
           <span>{{ adjustScoreDialog.form.originalScore }}</span>
         </el-form-item>
         <el-form-item label="调整后分数">
-          <el-input-number v-model="adjustScoreDialog.form.newScore" :min="0" :max="currentResultsExam.totalScore" />
+          <el-input-number v-model="adjustScoreDialog.form.newScore" :min="0" :max="100" />
         </el-form-item>
         <el-form-item label="调整原因">
           <el-input v-model="adjustScoreDialog.form.reason" type="textarea" :rows="3" placeholder="请输入调整原因" />
@@ -410,284 +453,114 @@
         </span>
       </template>
     </el-dialog>
+    <!-- 试卷详情抽屉 -->
+    <el-drawer
+      v-model="detailVisible"
+      title="试卷详情"
+      size="50%"
+      direction="rtl"
+    >
+      <div class="detail-drawer-content" v-if="detailStudent">
+        <div class="detail-header">
+           <h3>{{ detailStudent.name }} - {{ detailStudent.studentId }}</h3>
+           <div class="detail-score">
+             总分：<span class="score-value">{{ detailStudent.score }}</span>
+           </div>
+        </div>
+        <el-divider />
+        <!-- Reuse paper view structure, simplified -->
+        <div class="paper-preview">
+            <div v-for="(question, index) in paperQuestions" :key="index" class="question-item-preview">
+                <div class="q-title">
+                    <span class="q-no">{{ index + 1 }}.</span>
+                    <span class="q-text">{{ question.content }}</span>
+                    <span class="q-score">({{ question.score }}分)</span>
+                </div>
+                <div class="q-student-answer">
+                    <span class="label">学生答案：</span>
+                    <span class="value">{{ formatStudentAnswer(question) }}</span>
+                </div>
+                 <div class="q-grading">
+                    <span class="label">得分：</span>
+                    <span class="value score-text">{{ question.givenScore }}</span>
+                    <span class="label" style="margin-left: 15px">评语：</span>
+                    <span class="value">{{ question.comment || '无' }}</span>
+                </div>
+            </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue'
-import { Edit, Check, Download, Search } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, computed, inject } from 'vue'
+import { ArrowLeft, Edit, Upload, Check, Download, Search, Document } from '@element-plus/icons-vue'
+import { useRouter, useRoute } from 'vue-router'
+import { getScoreList, getExamStats, adjustScore, getStudentPaperDetail, submitGrading, getExamDetail, getExams } from '@/api/teacher'
 
 const router = useRouter()
+const route = useRoute()
 const showMessage = inject('showMessage')
+const showConfirm = inject('showConfirm')
 
 const activeTab = ref('grading')
 
-// ================= 阅卷管理逻辑 =================
+// ================= 导航逻辑 =================
+const showBackButton = computed(() => ['finished', 'monitor', 'paper'].includes(route.query.from))
 
-// 考试信息
-const gradingExamInfo = ref({
-  id: 1,
-  name: '计算机网络期末考试',
-  subject: '计算机网络',
-  examTime: '2023-10-20 14:00-16:00',
-  duration: 120,
-  totalScore: 100,
-  studentCount: 30,
-  gradedCount: 18
-})
-
-// 批阅状态
-const isGrading = ref(false)
-
-// 学生列表
-const gradingStudentList = ref([
-  { id: '2023001', name: '张三', status: 'graded', score: 85, submitTime: '2023-10-20 15:45:22', gradingTime: '2023-10-21 10:30:15' },
-  { id: '2023002', name: '李四', status: 'graded', score: 92, submitTime: '2023-10-20 15:50:36', gradingTime: '2023-10-21 11:15:42' },
-  { id: '2023003', name: '王五', status: 'ungraded', score: null, submitTime: '2023-10-20 15:55:18', gradingTime: null },
-  { id: '2023004', name: '赵六', status: 'ungraded', score: null, submitTime: '2023-10-20 15:58:47', gradingTime: null },
-  { id: '2023005', name: '钱七', status: 'graded', score: 78, submitTime: '2023-10-20 15:59:59', gradingTime: '2023-10-21 14:20:33' }
-])
-
-// 当前选中的学生
-const currentGradingStudent = ref({})
-
-// 筛选状态
-const gradingFilterStatus = ref('')
-
-// 筛选后的学生列表
-const filteredGradingStudents = computed(() => {
-  if (!gradingFilterStatus.value) {
-    return gradingStudentList.value
-  }
-  return gradingStudentList.value.filter(student => student.status === gradingFilterStatus.value)
-})
-
-// 是否有下一个学生
-const hasNextStudent = computed(() => {
-  const currentIndex = gradingStudentList.value.findIndex(s => s.id === currentGradingStudent.value.id)
-  return currentIndex < gradingStudentList.value.length - 1
-})
-
-// 试卷题目
-const paperQuestions = ref([
-  {
-    id: 1,
-    type: 'single',
-    content: 'TCP/IP协议中，以下哪个协议工作在传输层？',
-    options: [
-      { label: 'A', content: 'HTTP' },
-      { label: 'B', content: 'IP' },
-      { label: 'C', content: 'TCP' },
-      { label: 'D', content: 'ARP' }
-    ],
-    correctAnswer: 'C',
-    studentAnswer: 'C',
-    score: 2,
-    givenScore: 2,
-    autoGraded: true,
-    comment: ''
-  },
-  {
-    id: 2,
-    type: 'multiple',
-    content: '以下哪些是数据链路层的功能？',
-    options: [
-      { label: 'A', content: '差错控制' },
-      { label: 'B', content: '流量控制' },
-      { label: 'C', content: '路由选择' },
-      { label: 'D', content: '拥塞控制' }
-    ],
-    correctAnswer: ['A', 'B'],
-    studentAnswer: ['A', 'B', 'D'],
-    score: 4,
-    givenScore: 2,
-    autoGraded: true,
-    comment: ''
-  },
-  {
-    id: 3,
-    type: 'fill',
-    content: 'HTTP协议默认使用的端口号是_____。',
-    correctAnswer: '80',
-    studentAnswer: '80',
-    score: 2,
-    givenScore: 2,
-    autoGraded: true,
-    comment: ''
-  },
-  {
-    id: 4,
-    type: 'short',
-    content: '简述TCP三次握手的过程。',
-    correctAnswer: 'TCP三次握手过程：1. 客户端发送SYN包到服务器，进入SYN_SENT状态；2. 服务器收到SYN包，回应SYN+ACK包，进入SYN_RECV状态；3. 客户端收到SYN+ACK包，回应ACK包，双方进入ESTABLISHED状态。',
-    studentAnswer: 'TCP三次握手：客户端先发SYN，服务器回复SYN+ACK，客户端再发ACK，然后连接建立。这样可以确保双方都有收发能力。',
-    score: 10,
-    givenScore: 8,
-    autoGraded: false,
-    comment: '描述基本正确，但缺少状态变化的说明'
-  },
-  {
-    id: 5,
-    type: 'essay',
-    content: '论述计算机网络分层体系结构的意义，并比较OSI参考模型和TCP/IP模型的异同。',
-    correctAnswer: '计算机网络分层体系结构的意义在于...(标准答案)',
-    studentAnswer: '计算机网络分层的主要意义是将复杂的网络通信过程分解为若干个相对独立的部分，每层只需关注自己的功能，通过接口与相邻层交互。这样有利于标准化、模块化设计，便于实现和维护。\n\nOSI参考模型分为7层：物理层、数据链路层、网络层、传输层、会话层、表示层和应用层。而TCP/IP模型分为4层：网络接口层、网络层、传输层和应用层。\n\n相同点：两者都采用了分层的思想；都有网络层和传输层，功能相似。\n\n不同点：OSI是理论上的标准，TCP/IP是事实上的标准；OSI分7层，TCP/IP分4层；OSI先有模型后有协议，TCP/IP先有协议后有模型；TCP/IP模型更实用。',
-    score: 20,
-    givenScore: 16,
-    autoGraded: false,
-    comment: '论述比较全面，但对OSI各层功能的描述不够详细，对两种模型的比较可以更加深入'
-  }
-])
-
-// 获取题目类型标签
-const getQuestionTypeLabel = (type) => {
-  const typeMap = {
-    'single': '单选题',
-    'multiple': '多选题',
-    'fill': '填空题',
-    'judge': '判断题',
-    'short': '简答题',
-    'essay': '论述题',
-    'calculation': '计算题',
-    'programming': '程序题'
-  }
-  return typeMap[type] || '未知类型'
-}
-
-// 格式化学生答案
-const formatStudentAnswer = (question) => {
-  switch (question.type) {
-    case 'single':
-      const singleOption = question.options.find(opt => opt.label === question.studentAnswer)
-      return `${question.studentAnswer}: ${singleOption ? singleOption.content : ''}`
-    case 'multiple':
-      return question.studentAnswer.map(label => {
-        const option = question.options.find(opt => opt.label === label)
-        return `${label}: ${option ? option.content : ''}`
-      }).join('<br>')
-    case 'fill':
-      return question.studentAnswer
-    case 'judge':
-      return question.studentAnswer ? '正确' : '错误'
-    case 'short':
-    case 'essay':
-    case 'calculation':
-    case 'programming':
-      return question.studentAnswer.replace(/\n/g, '<br>')
-    default:
-      return question.studentAnswer
-  }
-}
-
-// 格式化正确答案
-const formatCorrectAnswer = (question) => {
-  switch (question.type) {
-    case 'single':
-      const singleOption = question.options.find(opt => opt.label === question.correctAnswer)
-      return `${question.correctAnswer}: ${singleOption ? singleOption.content : ''}`
-    case 'multiple':
-      return question.correctAnswer.map(label => {
-        const option = question.options.find(opt => opt.label === label)
-        return `${label}: ${option ? option.content : ''}`
-      }).join('<br>')
-    case 'fill':
-      return question.correctAnswer
-    case 'judge':
-      return question.correctAnswer ? '正确' : '错误'
-    default:
-      return question.correctAnswer
-  }
-}
-
-// 开始批阅
-const startGrading = () => {
-  isGrading.value = true
-  // 默认选择第一个未批阅的学生
-  const firstUngraded = gradingStudentList.value.find(s => s.status === 'ungraded')
-  if (firstUngraded) {
-    currentGradingStudent.value = firstUngraded
+const goBack = () => {
+  const from = route.query.from
+  if (from === 'finished') {
+    router.push({
+      name: 'TeacherExamManagement',
+      query: {
+        examStatusTab: 'finished',
+        activeModule: 'exam'
+      }
+    })
+  } else if (from === 'monitor') {
+    router.push({
+      name: 'TeacherExamManagement',
+      query: {
+        examStatusTab: 'ongoing',
+        activeModule: 'exam'
+      }
+    })
+  } else if (from === 'paper') {
+    router.push({
+      name: 'TeacherExamManagement',
+      query: {
+        activeModule: 'paper'
+      }
+    })
   } else {
-    currentGradingStudent.value = gradingStudentList.value[0]
+    router.push({ name: 'TeacherExamManagement' })
   }
 }
 
-// 完成批阅
-const finishGrading = () => {
-  isGrading.value = false
-  showMessage('批阅已完成', 'success')
-}
-
-// 选择学生
-const handleStudentSelect = (row) => {
-  currentGradingStudent.value = row
-  // 在实际应用中，这里应该加载该学生的答卷
-  showMessage(`已加载${row.name}的答卷`, 'success')
-}
-
-// 保存当前批阅
-const saveCurrentGrading = () => {
-  // 计算总分
-  const totalScore = paperQuestions.value.reduce((sum, q) => sum + q.givenScore, 0)
-  
-  // 更新学生状态
-  const studentIndex = gradingStudentList.value.findIndex(s => s.id === currentGradingStudent.value.id)
-  if (studentIndex !== -1) {
-    gradingStudentList.value[studentIndex].status = 'graded'
-    gradingStudentList.value[studentIndex].score = totalScore
-    gradingStudentList.value[studentIndex].gradingTime = new Date().toLocaleString()
-  }
-  
-  // 更新批阅进度
-  gradingExamInfo.value.gradedCount = gradingStudentList.value.filter(s => s.status === 'graded').length
-  
-  showMessage('批阅已保存', 'success')
-}
-
-// 下一个学生
-const nextStudent = () => {
-  const currentIndex = gradingStudentList.value.findIndex(s => s.id === currentGradingStudent.value.id)
-  if (currentIndex < gradingStudentList.value.length - 1) {
-    currentGradingStudent.value = gradingStudentList.value[currentIndex + 1]
-    // 在实际应用中，这里应该加载该学生的答卷
-    showMessage(`已加载${currentGradingStudent.value.name}的答卷`, 'success')
-  }
-}
-
-// 查看学生试卷
-const viewStudentPaper = (student) => {
-  currentGradingStudent.value = student
-  isGrading.value = true
-}
-
-// 编辑批阅
-const editGrading = (student) => {
-  currentGradingStudent.value = student
-  isGrading.value = true
-}
-
-// ================= 成绩统计逻辑 =================
-
-// 分页
-const resultsCurrentPage = ref(1)
-const resultsPageSize = ref(10)
-const resultsTotal = ref(0)
-
-// 筛选表单
-const resultsFilterForm = reactive({
-  examId: '',
-  classId: '',
-  keyword: ''
+const isAllGraded = computed(() => {
+  return allStudents.value.length > 0 && allStudents.value.every(s => s.status === 'graded')
 })
 
-// 考试选项
-const examOptions = ref([
-  { id: 1, name: '计算机网络期末考试' },
-  { id: 2, name: 'Java程序设计期中考试' },
-  { id: 3, name: '数据结构期末考试' }
-])
+const registerScores = () => {
+  // In real app: Call API to change exam status to "Published" or "ScoresRegistered"
+  showMessage('成绩登记成功！已同步至成绩管理', 'success')
+  activeTab.value = 'score'
+}
 
-// 班级选项
+// ================= 核心数据 (Shared Data) =================
+const currentExam = ref({
+  id: 1,
+  name: '加载中...',
+  subject: '',
+  examTime: '',
+  duration: 0,
+  totalScore: 0,
+  studentCount: 0
+})
+
+const examOptions = ref([]) // To be loaded from API
 const classOptions = ref([
   { id: 1, name: '计科1班' },
   { id: 2, name: '计科2班' },
@@ -695,176 +568,358 @@ const classOptions = ref([
   { id: 4, name: '软工2班' }
 ])
 
-// 当前选中的考试（成绩统计）
-const currentResultsExam = ref({})
+// 统一的学生数据源
+const allStudents = ref([])
 
-// 成绩列表
-const resultsList = ref([])
+const gradedCount = computed(() => allStudents.value.filter(s => s.status === 'graded').length)
 
-// 调整分数对话框
-const adjustScoreDialog = reactive({
-  visible: false,
-  form: {
-    studentId: '',
-    name: '',
-    originalScore: 0,
-    newScore: 0,
-    reason: ''
+// ================= 阅卷管理逻辑 =================
+const isGrading = ref(false)
+const currentGradingStudent = ref({})
+const gradingFilterStatus = ref('')
+
+// 映射 id -> studentId
+const filteredGradingStudents = computed(() => {
+  let list = allStudents.value
+  if (gradingFilterStatus.value) {
+    list = list.filter(student => student.status === gradingFilterStatus.value)
   }
+  return list
 })
 
-// 模拟数据 - 考试信息
-const mockResultsExamInfo = {
-  id: 1,
-  name: '计算机网络期末考试',
-  subject: '计算机网络',
-  examTime: '2023-10-20 14:00-16:00',
-  totalScore: 100,
-  studentCount: 120,
-  averageScore: 78.5,
-  highestScore: 98,
-  lowestScore: 45,
-  passRate: 85.2
-}
+const hasNextStudent = computed(() => {
+  const currentIndex = allStudents.value.findIndex(s => s.studentId === currentGradingStudent.value.studentId)
+  return currentIndex < allStudents.value.length - 1
+})
 
-// 模拟数据 - 成绩列表
-const mockResults = [
-  { studentId: '2023001', name: '张三', className: '计科1班', score: 92, rank: 1, submitTime: '2023-10-20 15:45:22', status: 'normal' },
-  { studentId: '2023002', name: '李四', className: '计科1班', score: 88, rank: 3, submitTime: '2023-10-20 15:50:36', status: 'normal' },
-  { studentId: '2023003', name: '王五', className: '计科2班', score: 76, rank: 8, submitTime: '2023-10-20 15:55:18', status: 'normal' },
-  { studentId: '2023004', name: '赵六', className: '软工1班', score: 90, rank: 2, submitTime: '2023-10-20 15:58:47', status: 'normal' },
-  { studentId: '2023005', name: '钱七', className: '软工2班', score: 85, rank: 4, submitTime: '2023-10-20 15:59:59', status: 'abnormal' },
-  { studentId: '2023006', name: '孙八', className: '计科1班', score: 72, rank: 10, submitTime: '2023-10-20 15:48:33', status: 'normal' },
-  { studentId: '2023007', name: '周九', className: '计科2班', score: 81, rank: 5, submitTime: '2023-10-20 15:52:41', status: 'normal' },
-  { studentId: '2023008', name: '吴十', className: '软工1班', score: 79, rank: 6, submitTime: '2023-10-20 15:56:27', status: 'normal' },
-  { studentId: '2023009', name: '郑十一', className: '软工2班', score: 65, rank: 12, submitTime: '2023-10-20 15:57:38', status: 'normal' },
-  { studentId: '2023010', name: '王十二', className: '计科1班', score: 77, rank: 7, submitTime: '2023-10-20 15:59:12', status: 'normal' }
+// Paper Questions
+const paperQuestions = ref([])
+
+const questionTypes = [
+  { label: '单选题', value: 'single_choice' },
+  { label: '多选题', value: 'multiple_choice' },
+  { label: '判断题', value: 'true_false' },
+  { label: '填空题', value: 'fill_blank' },
+  { label: '简答题', value: 'short_answer' },
+  { label: '编程题', value: 'programming' }
 ]
 
-// 获取分数样式类
-const getScoreClass = (score) => {
-  if (score >= 90) return 'score-excellent'
-  if (score >= 80) return 'score-good'
-  if (score >= 70) return 'score-medium'
-  if (score >= 60) return 'score-pass'
-  return 'score-fail'
+const getQuestionTypeLabel = (type) => {
+  const found = questionTypes.find(item => item.value === type)
+  return found ? found.label : type
 }
 
-// 加载成绩列表
-const loadResultsList = () => {
-  // 模拟API请求
-  setTimeout(() => {
-    if (resultsFilterForm.examId) {
-      currentResultsExam.value = { ...mockResultsExamInfo }
-      
-      // 过滤
-      let filteredResults = [...mockResults]
-      
-      if (resultsFilterForm.classId) {
-        const className = classOptions.value.find(c => c.id === resultsFilterForm.classId)?.name
-        filteredResults = filteredResults.filter(r => r.className === className)
-      }
-      
-      if (resultsFilterForm.keyword) {
-        const keyword = resultsFilterForm.keyword.toLowerCase()
-        filteredResults = filteredResults.filter(r => 
-          r.studentId.toLowerCase().includes(keyword) || 
-          r.name.toLowerCase().includes(keyword)
-        )
-      }
-      
-      resultsTotal.value = filteredResults.length
-      
-      // 分页
-      const start = (resultsCurrentPage.value - 1) * resultsPageSize.value
-      const end = start + resultsPageSize.value
-      resultsList.value = filteredResults.slice(start, end)
+const formatStudentAnswer = (question) => {
+    if (Array.isArray(question.studentAnswer)) return question.studentAnswer.join(', ')
+    return question.studentAnswer || '未作答'
+}
+
+const formatCorrectAnswer = (question) => {
+    if (Array.isArray(question.correctAnswer)) return question.correctAnswer.join(', ')
+    return question.correctAnswer
+}
+
+const startGrading = () => {
+    // Find first ungraded student or first student
+    const firstUngraded = allStudents.value.find(s => s.status === 'ungraded')
+    if (firstUngraded) {
+        handleGradeStudent(firstUngraded)
+    } else if (allStudents.value.length > 0) {
+        handleGradeStudent(allStudents.value[0])
     } else {
-      currentResultsExam.value = {}
-      resultsList.value = []
-      resultsTotal.value = 0
+        showMessage('暂无学生数据', 'warning')
     }
-  }, 500)
 }
 
-// 处理搜索
-const handleSearch = () => {
-  resultsCurrentPage.value = 1
-  loadResultsList()
+const handleGradeStudent = async (row) => {
+    try {
+        currentGradingStudent.value = row
+        // Fetch paper detail for this student
+        const res = await getStudentPaperDetail(currentExam.value.id, row.studentId)
+        if (res && res.questions) {
+            paperQuestions.value = res.questions
+        } else {
+             paperQuestions.value = []
+        }
+        isGrading.value = true
+    } catch (error) {
+        console.error(error)
+        showMessage('获取答卷失败', 'error')
+    }
 }
 
-// 重置过滤条件
-const resetFilter = () => {
-  resultsFilterForm.classId = ''
-  resultsFilterForm.keyword = ''
-  handleSearch()
+const handleNextStudent = () => {
+    const currentIndex = allStudents.value.findIndex(s => s.studentId === currentGradingStudent.value.studentId)
+    if (currentIndex < allStudents.value.length - 1) {
+        handleGradeStudent(allStudents.value[currentIndex + 1])
+    }
 }
 
-// 处理页码变化
-const handleResultsCurrentChange = () => {
-  loadResultsList()
+const finishGrading = () => {
+    isGrading.value = false
+    paperQuestions.value = []
+    currentGradingStudent.value = {}
+    loadData() // Refresh list
 }
 
-// 处理每页数量变化
-const handleResultsSizeChange = () => {
-  resultsCurrentPage.value = 1
-  loadResultsList()
-}
-
-// 导出成绩
-const exportResults = () => {
-  if (!currentResultsExam.value.id) {
-    showMessage('请先选择一个考试', 'warning')
-    return
-  }
-  showMessage('成绩导出功能待实现', 'info')
-}
-
-// 查看详情
-const viewDetail = (row) => {
-  // 实际应用中可以跳转到详情页或弹窗
-  showMessage(`查看学生 ${row.name} 的成绩详情`, 'info')
-}
-
-// 调整分数
-const adjustScore = (row) => {
-  adjustScoreDialog.form = {
-    studentId: row.studentId,
-    name: row.name,
-    originalScore: row.score,
-    newScore: row.score,
-    reason: ''
-  }
-  adjustScoreDialog.visible = true
-}
-
-// 确认调整分数
-const confirmAdjustScore = () => {
-  if (!adjustScoreDialog.form.reason) {
-    showMessage('请输入调整原因', 'warning')
-    return
-  }
-  
-  // 模拟API请求
-  setTimeout(() => {
-    // 更新列表中的分数
-    const index = resultsList.value.findIndex(r => r.studentId === adjustScoreDialog.form.studentId)
-    if (index !== -1) {
-      resultsList.value[index].score = adjustScoreDialog.form.newScore
-      // 重新排序和计算排名（实际应用中应该由后端处理）
+const handleSubmitGrading = async () => {
+    // Collect scores
+    const gradingData = {
+        questions: paperQuestions.value.map(q => ({
+            id: q.id,
+            givenScore: q.givenScore,
+            comment: q.comment
+        }))
     }
     
-    showMessage('分数调整成功', 'success')
-    adjustScoreDialog.visible = false
-  }, 500)
+    try {
+        await submitGrading(currentExam.value.id, currentGradingStudent.value.studentId, gradingData)
+        showMessage('提交成功', 'success')
+        
+        // Update local status
+        const student = allStudents.value.find(s => s.studentId === currentGradingStudent.value.studentId)
+        if (student) {
+            student.status = 'graded'
+            student.score = paperQuestions.value.reduce((sum, q) => sum + (q.givenScore || 0), 0)
+        }
+        
+        if (hasNextStudent.value) {
+            handleNextStudent()
+        } else {
+            showConfirm('已是最后一名学生，是否结束阅卷？', '提示', 'success')
+            .then(() => finishGrading())
+            .catch(() => {})
+        }
+    } catch (error) {
+        console.error(error)
+        showMessage('提交失败', 'error')
+    }
+}
+
+const handleStudentSelect = (row) => {
+    // Just highlight or select, but if in grading mode, maybe switch to that student?
+    if (isGrading.value) {
+        handleGradeStudent(row)
+    }
+}
+
+const saveCurrentGrading = () => {
+    handleSubmitGrading()
+}
+
+// ================= 成绩查询逻辑 =================
+const scoreFilterForm = reactive({
+    classId: '',
+    keyword: '',
+    examId: ''
+})
+const scoreCurrentPage = ref(1)
+const scorePageSize = ref(10)
+
+const filteredScoreList = computed(() => {
+    let list = allStudents.value
+    if (scoreFilterForm.classId) {
+        const cls = classOptions.value.find(c => c.id === scoreFilterForm.classId)
+        if (cls) list = list.filter(s => s.className === cls.name)
+    }
+    if (scoreFilterForm.keyword) {
+        list = list.filter(s => s.name.includes(scoreFilterForm.keyword) || s.studentId.includes(scoreFilterForm.keyword))
+    }
+    return list
+})
+
+const paginatedScoreList = computed(() => {
+    const start = (scoreCurrentPage.value - 1) * scorePageSize.value
+    const end = start + scorePageSize.value
+    return filteredScoreList.value.slice(start, end)
+})
+
+const handleScoreSearch = () => {
+    scoreCurrentPage.value = 1
+    loadData()
+}
+
+const handleScoreExamChange = () => {
+    loadData()
+}
+
+const resetScoreFilter = () => {
+    scoreFilterForm.classId = ''
+    scoreFilterForm.keyword = ''
+    scoreFilterForm.examId = ''
+    handleScoreSearch()
+}
+
+const selectedStudents = ref([])
+const handleSelectionChange = (val) => {
+    selectedStudents.value = val
+}
+
+const batchPublish = (publish) => {
+    showMessage(`批量${publish ? '发布' : '撤回'}功能待后端接口`, 'info')
+}
+
+const importScores = () => {
+    showMessage('导入功能待后端接口', 'info')
+}
+
+const exportResults = () => {
+    showMessage('导出功能待后端接口', 'info')
+}
+
+const viewDetail = (row) => {
+    viewStudentPaper(row)
+}
+
+const detailVisible = ref(false)
+const detailStudent = ref(null)
+
+const viewStudentPaper = async (row) => {
+    detailStudent.value = row
+    try {
+        const res = await getStudentPaperDetail(currentExam.value.id, row.studentId)
+        if (res && res.questions) {
+            paperQuestions.value = res.questions
+        } else {
+             paperQuestions.value = []
+        }
+        detailVisible.value = true
+    } catch (error) {
+        console.error(error)
+        showMessage('获取详情失败', 'error')
+    }
+}
+
+const editGrading = (row) => {
+    handleGradeStudent(row)
+}
+
+const getScoreClass = (score) => {
+    if (score === null) return ''
+    if (score < 60) return 'text-danger'
+    if (score >= 90) return 'text-success'
+    return 'text-primary'
+}
+
+const getRank = (row) => {
+    const sorted = [...allStudents.value].sort((a, b) => (b.score || 0) - (a.score || 0))
+    const index = sorted.findIndex(s => s.studentId === row.studentId)
+    return index + 1
+}
+
+const adjustScoreDialog = reactive({
+    visible: false,
+    form: {
+        studentId: '',
+        name: '',
+        originalScore: 0,
+        newScore: 0,
+        reason: ''
+    }
+})
+
+const handleAdjustScore = (row) => {
+    adjustScoreDialog.form = {
+        studentId: row.studentId,
+        name: row.name,
+        originalScore: row.score,
+        newScore: row.score,
+        reason: ''
+    }
+    adjustScoreDialog.visible = true
+}
+
+const confirmAdjustScore = async () => {
+    try {
+        await adjustScore(currentExam.value.id, { 
+            studentId: adjustScoreDialog.form.studentId,
+            score: adjustScoreDialog.form.newScore,
+            reason: adjustScoreDialog.form.reason
+        })
+        showMessage('成绩调整成功', 'success')
+        adjustScoreDialog.visible = false
+        loadData()
+    } catch (error) {
+        console.error(error)
+        showMessage('调整失败', 'error')
+    }
+}
+
+// ================= 成绩分析逻辑 =================
+const analysisFilterForm = reactive({
+    examId: ''
+})
+const analysisData = ref({
+    totalCount: 0,
+    avgScore: 0,
+    maxScore: 0,
+    minScore: 0,
+    passRate: 0,
+    dist: [0, 0, 0, 0, 0],
+    distCount: [0, 0, 0, 0, 0],
+    classStats: [],
+    knowledgePoints: []
+})
+
+const calculateAnalysisData = async () => {
+    if (!analysisFilterForm.examId) return
+    
+    try {
+        const res = await getExamStats(analysisFilterForm.examId)
+        if (res) {
+            analysisData.value = res
+        }
+    } catch (error) {
+        console.error(error)
+    }
+}
+
+const loadData = async () => {
+    // Load exam options
+    try {
+        const examsRes = await getExams({ size: 100 })
+        if (examsRes && examsRes.list) {
+            examOptions.value = examsRes.list
+        }
+    } catch (error) {
+        console.error(error)
+    }
+
+    // Load exam info
+    const examId = route.query.examId || analysisFilterForm.examId || scoreFilterForm.examId
+    if (examId) {
+        analysisFilterForm.examId = Number(examId)
+        scoreFilterForm.examId = Number(examId)
+        try {
+             const examRes = await getExamDetail(examId)
+             if (examRes) currentExam.value = examRes
+             
+             const scoresRes = await getScoreList({ examId: examId })
+             if (scoresRes && scoresRes.list) {
+                 allStudents.value = scoresRes.list
+             } else {
+                 allStudents.value = []
+             }
+             
+             calculateAnalysisData()
+             
+        } catch (error) {
+            console.error(error)
+        }
+    }
+}
+
+const handleTabChange = (tab) => {
+    if (tab === 'analysis') {
+        calculateAnalysisData()
+    }
 }
 
 onMounted(() => {
-  // 默认选择第一个考试
-  if (examOptions.value.length > 0) {
-    resultsFilterForm.examId = examOptions.value[0].id
-    loadResultsList()
+  if (route.query.activeTab) {
+    activeTab.value = route.query.activeTab
   }
+  loadData()
 })
 </script>
 
@@ -872,265 +927,63 @@ onMounted(() => {
 .score-management-container {
   padding: 20px;
 }
-
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
-
 .page-title {
   margin: 0;
   font-size: 20px;
   font-weight: bold;
 }
-
-.exam-info-card {
+.score-summary-row {
   margin-bottom: 20px;
 }
-
-.exam-info {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-}
-
-.info-item {
-  display: flex;
-}
-
-.label {
-  font-weight: bold;
-  margin-right: 5px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* Grading Styles */
-.paper-card {
-  margin-bottom: 20px;
-}
-
-.paper-content {
-  max-height: calc(100vh - 250px);
-  overflow-y: auto;
-  padding-right: 10px;
-}
-
-.question-item {
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.question-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.question-title {
-  font-weight: bold;
-}
-
-.question-number {
-  margin-right: 5px;
-}
-
-.question-type {
-  color: var(--el-color-primary);
-  margin-right: 10px;
-}
-
-.student-answer, .correct-answer {
-  margin-bottom: 15px;
-}
-
-.answer-label {
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.answer-content {
-  padding: 10px;
-  background-color: var(--el-fill-color-lighter);
-  border-radius: 4px;
-}
-
-.grading-area {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: var(--el-fill-color-light);
-  border-radius: 4px;
-}
-
-.score-input {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.max-score {
-  margin-left: 5px;
-  color: var(--el-text-color-secondary);
-}
-
-.comment-input {
-  display: flex;
-  align-items: flex-start;
-}
-
-.comment-input span {
-  margin-right: 10px;
-  margin-top: 5px;
-}
-
-.auto-graded {
-  margin-top: 15px;
-}
-
-.grading-actions {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.student-list-card {
-  height: calc(100vh - 250px);
-  display: flex;
-  flex-direction: column;
-}
-
-.student-list {
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Results Styles */
-.filter-card {
-  margin-bottom: 20px;
-}
-
-.filter-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.charts-container {
-  margin-bottom: 20px;
-}
-
-.chart-card {
-  height: 300px;
-  margin-bottom: 20px;
-}
-
-.chart-placeholder {
-  height: 230px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.chart-mock {
-  width: 100%;
-  height: 200px;
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-}
-
-.chart-bar {
-  width: 60px;
-  background-color: var(--el-color-primary);
-  border-radius: 4px 4px 0 0;
-  position: relative;
-  transition: height 0.3s;
-}
-
-.chart-label {
-  position: absolute;
-  bottom: -25px;
-  left: 0;
-  width: 100%;
+.summary-card {
   text-align: center;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
-
-.chart-mock.horizontal {
-  flex-direction: column;
-  align-items: flex-start;
-  height: 100%;
+.card-header-small {
+  font-size: 14px;
+  color: #909399;
 }
-
-.chart-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.chart-row .chart-label {
-  position: static;
-  width: 80px;
-  text-align: right;
-  margin-right: 10px;
-}
-
-.chart-bar-h {
-  height: 30px;
-  background-color: var(--el-color-primary);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  color: white;
-  transition: width 0.3s;
-}
-
-.results-table-card {
-  margin-bottom: 20px;
-}
-
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.no-exam-selected {
-  margin-top: 100px;
-}
-
-.score-excellent {
-  color: #67C23A;
+.summary-value {
+  font-size: 24px;
   font-weight: bold;
+  margin-top: 10px;
 }
+.text-primary { color: var(--el-color-primary); }
+.text-success { color: var(--el-color-success); }
+.text-danger { color: var(--el-color-danger); }
+.text-warning { color: var(--el-color-warning); }
 
-.score-good {
-  color: #409EFF;
-  font-weight: bold;
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
 }
-
-.score-medium {
-  color: #E6A23C;
+.filter-title {
+    font-weight: bold;
+    font-size: 16px;
 }
-
-.score-pass {
-  color: #F56C6C;
+.detail-header {
+    margin-bottom: 20px;
 }
-
-.score-fail {
-  color: #F56C6C;
-  font-weight: bold;
+.detail-score {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+.score-value {
+    color: var(--el-color-danger);
+    font-size: 24px;
+}
+.question-item-preview {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f5f7fa;
+    border-radius: 4px;
 }
 </style>
