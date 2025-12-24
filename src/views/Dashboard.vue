@@ -191,7 +191,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
   Document, Collection, Files, Calendar, Edit, 
@@ -204,7 +204,7 @@ const route = useRoute()
 const sidebarCollapsed = ref(false)
 const username = ref(localStorage.getItem('username') || '用户')
 const userType = ref(localStorage.getItem('userType') || 'student')
-const avatarUrl = ref('')
+const avatarUrl = ref(localStorage.getItem('userAvatar') || '')
 const disabledModules = ref((localStorage.getItem('disabledModules') || '').split(','))
 
 const activeMenu = computed(() => route.path)
@@ -232,12 +232,26 @@ const handleCommand = (command) => {
     localStorage.removeItem('token')
     localStorage.removeItem('userType')
     localStorage.removeItem('username')
+    localStorage.removeItem('userAvatar')
     router.push('/login')
   } else if (command === 'profile') {
-    router.push({ name: 'UserProfile' })
+    if (userType.value === 'student') {
+      router.push({ name: 'StudentProfile', query: { tab: 'basic' } })
+    } else {
+      router.push({ name: 'UserProfile' })
+    }
   } else if (command === 'settings') {
-    router.push({ name: 'AccountSettings' })
+    if (userType.value === 'student') {
+      router.push({ name: 'StudentProfile', query: { tab: 'security' } })
+    } else {
+      router.push({ name: 'AccountSettings' })
+    }
   }
+}
+
+const updateUserInfo = () => {
+  avatarUrl.value = localStorage.getItem('userAvatar') || ''
+  username.value = localStorage.getItem('username') || '用户'
 }
 
 onMounted(() => {
@@ -246,6 +260,11 @@ onMounted(() => {
   if (!token) {
     router.push('/login')
   }
+  window.addEventListener('user-info-update', updateUserInfo)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('user-info-update', updateUserInfo)
 })
 </script>
 
